@@ -1,0 +1,6 @@
+project_id   =    #Google Cloud Project ID
+region       =    #Google Cloud region
+zone         =    #Google Cloud zone
+cluster_name =    #Name of the cluster
+node_count   =    #Number of nodes in the cluster
+machine_type =    #Machine type for the nodes
