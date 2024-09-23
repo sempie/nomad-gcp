@@ -1,3 +1,6 @@
 .terraform*
 *.token
 *.tfstate*
+*.tfvars
+.env
+nomad.yaml
