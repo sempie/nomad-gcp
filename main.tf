@@ -128,9 +128,13 @@ resource "google_compute_instance" "hashicorp_node" {
     apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     apt-get update
     apt-get install -y nomad consul vault jq
+    mkdir -p /opt/traefikee /opt/traefikee-plugins
+    mkdir -p /var/log/vault
+    chown vault:vault /var/log/vault
 
-    # Get the instance's internal IP
+    # Get the instance's IP
     INTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+    EXTERNAL_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 
     # Configure Consul
     cat <<EOT > /etc/consul.d/consul.hcl
@@ -156,8 +160,39 @@ resource "google_compute_instance" "hashicorp_node" {
     acl {
       enabled = true
     }
+    vault {
+      enabled = true
+      address = "http://127.0.0.1:8200"
+
+      default_identity {
+        aud = ["vault.io"]
+        ttl = "1h"
+      }
+    }
+    log_level = "INFO"
+    log_file = "/var/log/nomad/nomad.log"
+    plugin "docker" {
+      config {
+        allow_privileged = true
+        volumes {
+          enabled = true
+        }
+      }
+    }
     client {
       enabled = true
+
+      host_volume "traefikee-data" {
+        path = "/opt/traefikee"
+        read_only = false
+      }
+      host_volume "traefikee-plugins" {
+        path      = "/opt/traefikee-plugins"
+        read_only = false
+      }
+        options {
+          "docker.volumes.enabled" = true
+        }
     }
     consul {
       address = "127.0.0.1:8500"
@@ -179,6 +214,13 @@ resource "google_compute_instance" "hashicorp_node" {
       address     = "0.0.0.0:8200"
       tls_disable = 1
     }
+    ui = true
+
+    log_level = "info"
+    log_file = "/var/log/vault/vault.log"
+
+    api_addr = "http://$${EXTERNAL_IP}:8200"
+    cluster_addr = "http://$${INTERNAL_IP}:8201"
     EOT
 
     # Start services
